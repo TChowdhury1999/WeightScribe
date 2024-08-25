@@ -9,7 +9,9 @@ import pandas as pd
 
 
 """
-Contains main functions for use
+Contains main functions for use in the app
+
+extract_weight_df() takes the video path and saves the output df to output_path
 """
 
 def get_motion_arr(video_path):
@@ -275,7 +277,7 @@ def package_to_df(dates, weights):
 
     return (pd.DataFrame({"datetime":timestamps, "weight": weights}))
 
-def path_to_weight_df(video_path):
+def extract_weight_df(video_path, output_path):
 
     motion_2d_arr = get_motion_arr(video_path)
     run_indices = get_run_indices(motion_2d_arr)
@@ -284,6 +286,6 @@ def path_to_weight_df(video_path):
     date_run, weight_run = get_runs(reader, frame, motion_2d_arr, run_indices)
     dates, weights = get_info(video_path, reader, motion_2d_arr, date_run, weight_run)
     weight_df = package_to_df(dates, weights)
+    weight_df.to_csv(output_path, index=False)
 
-    return(weight_df)
-    
+    return()
