@@ -255,6 +255,8 @@ def get_info(video_path, reader, motion_2d_arr, date_run, weight_run):
 
     cap.release()
 
+    return(dates, weights)
+
 def package_to_df(dates, weights):
     """
     Process date info into timestamps and then packages into a pandas dataframe
@@ -277,7 +279,7 @@ def package_to_df(dates, weights):
 
     return (pd.DataFrame({"datetime":timestamps, "weight": weights}))
 
-def extract_weight_df(video_path, output_path):
+def extract_weight_df(video_path, output_path, filename):
 
     motion_2d_arr = get_motion_arr(video_path)
     run_indices = get_run_indices(motion_2d_arr)
@@ -286,6 +288,6 @@ def extract_weight_df(video_path, output_path):
     date_run, weight_run = get_runs(reader, frame, motion_2d_arr, run_indices)
     dates, weights = get_info(video_path, reader, motion_2d_arr, date_run, weight_run)
     weight_df = package_to_df(dates, weights)
-    weight_df.to_csv(output_path, index=False)
+    weight_df.to_csv(output_path+"/"+filename, index=False)
 
     return()
