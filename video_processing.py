@@ -279,6 +279,19 @@ def package_to_df(dates, weights):
 
     return (pd.DataFrame({"datetime":timestamps, "weight": weights}))
 
+def pretify_df(df):
+    df["date"] = pd.to_datetime(df["datetime"]).dt.strftime('%a %d %b %Y')
+
+    # remove current year
+    current_year = dt.datetime.now().year
+    df["date"] = df["date"].apply(lambda x: x[:-5] if x[-4:] == str(current_year) else x)
+
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df.set_index("datetime", inplace=True)
+    df['rolling_avg'] = df['weight'].rolling(window='7D').mean().round(2)
+
+    return df
+
 def extract_weight_df(video_path, output_path, filename):
 
     motion_2d_arr = get_motion_arr(video_path)
@@ -288,6 +301,7 @@ def extract_weight_df(video_path, output_path, filename):
     date_run, weight_run = get_runs(reader, frame, motion_2d_arr, run_indices)
     dates, weights = get_info(video_path, reader, motion_2d_arr, date_run, weight_run)
     weight_df = package_to_df(dates, weights)
-    weight_df.to_csv(output_path+"/"+filename, index=False)
+    weight_df = pretify_df(weight_df)
+    weight_df.to_csv(output_path+"/"+filename+".csv", index=False)
 
     return()
