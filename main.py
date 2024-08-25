@@ -1,27 +1,78 @@
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.button import Button
+from kivy.uix.label import Label
 from plyer import filechooser
 from kivy.clock import mainthread
+from kivy.uix.scrollview import ScrollView
+from kivy.config import Config
 
 
-class VideoProcessorApp(App):
+class CalloutLabel(AnchorLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.anchor_x = "center"
+        self.anchor_y = "center"
+
+        callout_label = Label(text="Your weekly change is -0.74kg", size_hint = (0.9, 0.9))
+        self.add_widget(callout_label)
+
+class TableGraphSelector(BoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = "horizontal"
+        self.padding = 0
+        self.spacing = 0
+
+        table_button = Button(text="Table", size_hint = (0.5, 1))
+        graph_button = Button(text="Graph", size_hint = (0.5, 1))
+        
+        self.add_widget(table_button)
+        self.add_widget(graph_button)
+
+
+
+class WeightScribeApp(App):
     def build(self):
-        self.title = 'Video Processor'
-        layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        self.title = 'WeightScribe'
+        
+        # start with splitting the title bar and app content
+        title_body_layout = BoxLayout(orientation='vertical', padding=0, spacing=0)
+        title_label = Label(text="WeightScribe", size_hint = (1, 0.1))
+        title_body_layout.add_widget(title_label)
 
-        self.select_button = Button(text='Select Video', size_hint=(1, 0.2))
+        # add the body 
+        body_layout = BoxLayout(orientation = "vertical", padding=0, spacing=0, size_hint = (1, 0.8))
+        title_body_layout.add_widget(body_layout)
+
+        # body layout split into callout, table/graph selector, table/graph, upload/download
+
+        callout_label = CalloutLabel(size_hint = (1, 0.1))
+        body_layout.add_widget(callout_label)
+
+        table_graph_selector = TableGraphSelector(size_hint = (1, 0.05))
+        body_layout.add_widget(table_graph_selector)
+
+        table_graph_placeholder = Button(text="table/graph", size_hint = (1, 0.65))
+        body_layout.add_widget(table_graph_placeholder)
+
+        upload_download_section = BoxLayout(orientation="horizontal", size_hint = (1, 0.2))
+
+        self.select_button = Button(text='Select Video', size_hint=(0.5, 1))
         self.select_button.bind(on_press=self.select_video)
-        layout.add_widget(self.select_button)
+        upload_download_section.add_widget(self.select_button)
 
-        self.download_button = Button(text='Download CSV', size_hint=(1, 0.2), disabled=True)
+        self.download_button = Button(text='Download CSV', size_hint=(.5, 1), disabled=True)
         self.download_button.bind(on_press=self.download_csv)
-        layout.add_widget(self.download_button)
+        upload_download_section.add_widget(self.download_button)
+
+        body_layout.add_widget(upload_download_section)
 
         self.video_path = None
         self.dataframe = None
 
-        return layout
+        return title_body_layout
 
     def select_video(self, instance):
         filechooser.open_file(on_selection=self.handle_selection, filters=[("Video Files", "*.mp4;*.avi;*.mov")])
@@ -59,4 +110,8 @@ class VideoProcessorApp(App):
             print("Save cancelled.")
 
 if __name__ == '__main__':
-    VideoProcessorApp().run()
+    width = 360
+    height = int((2000/1080) * width)
+    Config.set('graphics', 'width', f'{width}')
+    Config.set('graphics', 'height', f'{height}')
+    WeightScribeApp().run()
