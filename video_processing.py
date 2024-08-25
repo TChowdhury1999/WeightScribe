@@ -279,7 +279,7 @@ def package_to_df(dates, weights):
 
     return (pd.DataFrame({"datetime":timestamps, "weight": weights}))
 
-def pretify_df(df):
+def prettify_df(df):
     df["date"] = pd.to_datetime(df["datetime"]).dt.strftime('%a %d %b %Y')
 
     # remove current year
@@ -301,7 +301,7 @@ def extract_weight_df(video_path, output_path, filename):
     date_run, weight_run = get_runs(reader, frame, motion_2d_arr, run_indices)
     dates, weights = get_info(video_path, reader, motion_2d_arr, date_run, weight_run)
     weight_df = package_to_df(dates, weights)
-    weight_df = pretify_df(weight_df)
+    weight_df = prettify_df(weight_df)
     weight_df.to_csv(output_path+"/"+filename+".csv", index=False)
 
     return()
