@@ -18,7 +18,7 @@ from kivy.core.window import Window
 import pandas as pd
 import datetime as dt
 from scipy.stats import linregress
-from kivy_garden.graph import Graph, MeshLinePlot
+from kivy_garden.graph import Graph, MeshLinePlot, LinePlot, ScatterPlot
 import src.colours as colours
 
 
@@ -108,17 +108,12 @@ class BinaryButton(BoxLayout):
         self.table_widget.rolling_view = True
         self.table_widget.populate_table()
         
-
 class Table(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.orientation = "vertical"
         self.rolling_view = False
         self.df = App.get_running_app().weight_df
-
-        # want three sections: top one will have binary switch between weight and MA weight, 
-        # next is table header which doesnt scroll
-        # then table content in the scroll view
 
         table_binary_layout = BoxLayout(orientation="horizontal", size_hint = (1, 0.1))
         weight_selection_label = Label(text="Weight", size_hint_x = None)
@@ -156,6 +151,84 @@ class Table(BoxLayout):
         row_height = window_height * 0.05
         self.table_layout.height = len(self.df) * row_height
 
+class WeightGraphWidget(Graph):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        df = App.get_running_app().weight_df
+
+        todays_date = dt.datetime.now()
+        df["days_since_today"] = (todays_date - pd.to_datetime(df["datetime"])).dt.days.astype(int)
+        weight_max_min = (int(pd.concat([df["weight"], df["rolling_avg"]]).max()), int(pd.concat([df["weight"], df["rolling_avg"]]).min()))
+        max_days = df["days_since_today"].max()
+
+        self.xlabel = "Days from Today"
+        self.ylabel = "Weight (kg)"
+        self.x_ticks_minor = 4
+        self.x_ticks_major = 30
+        self.y_ticks_minor = 2
+        self.y_ticks_major = 1
+        self.y_grid_label = True
+        self.x_grid_label = True
+        self.padding = 5
+        self.x_grid = True
+        self.y_grid = True
+        self.xmin = 0
+        self.xmax = 30
+        self.ymin = weight_max_min[1]*0.99
+        self.ymax = weight_max_min[0]*1.01
+
+        self.zoom_days = [30, 60, 90, 180, 365, 730]
+        self.zoom_days = [days for days in self.zoom_days if days <= max_days] + [int(max_days)]
+
+        scatter_plot = ScatterPlot(color=[1, 0, 0, 1])
+        scatter_plot.points = list(zip(df["days_since_today"], df["weight"]))
+
+        line_plot = LinePlot(color=[1, 0, 0, 1])
+        line_plot.points = list(zip(df["days_since_today"], df["rolling_avg"]))
+
+        self.add_plot(scatter_plot)
+        self.add_plot(line_plot)
+
+    def zoom_in(self, instance):
+        if self.xmax <= 30:
+            # cant zoom in anymore
+            return
+        else:
+            current_zoom = self.zoom_days.index(self.xmax)
+            self.xmax = self.zoom_days[current_zoom-1]
+
+    def zoom_out(self, instance):
+        if self.xmax >= max(self.zoom_days):
+            # cant zoom out anymore
+            return
+        else:
+            current_zoom = self.zoom_days.index(self.xmax)
+            self.xmax = self.zoom_days[current_zoom+1]
+
+class WeightGraph(BoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = "vertical"
+        
+        # graph and then graph zoom in and out controls
+        self.graph_widget = WeightGraphWidget()
+        self.add_widget(self.graph_widget)
+
+        graph_controls_layout = BoxLayout(orientation="horizontal", size_hint = (1, 0.1))
+        zoom_in_button = Button(text="+")
+        zoom_out_button = Button(text="-")
+
+        zoom_in_button.bind(on_press=self.graph_widget.zoom_in)
+        zoom_out_button.bind(on_press=self.graph_widget.zoom_out)
+        spacing_widget = Label(size_hint_x = 2)
+
+        graph_controls_layout.add_widget(spacing_widget)
+        graph_controls_layout.add_widget(zoom_out_button)
+        graph_controls_layout.add_widget(zoom_in_button)
+        self.add_widget(graph_controls_layout)
+
+
+
 class TableGraphContent(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -169,16 +242,7 @@ class TableGraphContent(BoxLayout):
 
     def show_graph(self):
         self.clear_widgets()
-
-        graph = Graph(xlabel='X', ylabel='Y', x_ticks_minor=5, x_ticks_major=25,
-                      y_ticks_minor=1, y_ticks_major=10, y_grid_label=True,
-                      x_grid_label=True, padding=5, x_grid=True, y_grid=True, 
-                      xmin=-0, xmax=100, ymin=-1, ymax=1)
-
-        plot = MeshLinePlot(color=[1, 0, 0, 1])
-        plot.points = [(x, 0.5 * x % 1) for x in range(0, 101)]
-        graph.add_plot(plot)
-
+        graph = WeightGraph()
         self.add_widget(graph)
 
 
