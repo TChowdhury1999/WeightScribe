@@ -1,3 +1,10 @@
+from kivy.config import Config
+if __name__ == '__main__':
+    width = 360
+    height = int((2000/1080) * width)
+    Config.set('graphics', 'width', f'{width}')
+    Config.set('graphics', 'height', f'{height}')
+
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.anchorlayout import AnchorLayout
@@ -7,12 +14,12 @@ from kivy.uix.label import Label
 from plyer import filechooser
 from kivy.clock import mainthread
 from kivy.uix.scrollview import ScrollView
-from kivy.config import Config
+from kivy.core.window import Window
 import pandas as pd
 import datetime as dt
 from scipy.stats import linregress
 from kivy_garden.graph import Graph, MeshLinePlot
-import matplotlib.pyplot as plt
+import src.colours as colours
 
 
 class CalloutLabel(AnchorLayout):
@@ -74,6 +81,81 @@ class TableGraphSelector(BoxLayout):
         # Update content to show the graph
         self.content_widget.show_graph()        
 
+class BinaryButton(BoxLayout):
+    def __init__(self, table_widget, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = "horizontal"
+        self.table_widget = table_widget
+
+        self.weight_button = Button(text="Weight", size_hint = (0.5, 1), state="down")
+        self.MA_button = Button(text="MA Weight", size_hint = (0.5, 1))
+
+        self.weight_button.bind(on_press=self.change_weight)
+        self.MA_button.bind(on_press=self.change_MA_weight)
+
+        self.add_widget(self.weight_button)
+        self.add_widget(self.MA_button)
+
+    def change_weight(self, instance):
+        self.weight_button.state = "down"
+        self.MA_button.state = "normal"
+        self.table_widget.rolling_view = False
+        self.table_widget.populate_table()
+
+    def change_MA_weight(self, instance):
+        self.weight_button.state = "normal"
+        self.MA_button.state = "down"
+        self.table_widget.rolling_view = True
+        self.table_widget.populate_table()
+        
+
+class Table(BoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = "vertical"
+        self.rolling_view = False
+        self.df = App.get_running_app().weight_df
+
+        # want three sections: top one will have binary switch between weight and MA weight, 
+        # next is table header which doesnt scroll
+        # then table content in the scroll view
+
+        table_binary_layout = BoxLayout(orientation="horizontal", size_hint = (1, 0.1))
+        weight_selection_label = Label(text="Weight", size_hint_x = None)
+        weight_binary_button = BinaryButton(size_hint_x = None, table_widget=self)
+        table_binary_spacer = Label(size_hint_x = 1)
+        table_binary_layout.add_widget(weight_selection_label)
+        table_binary_layout.add_widget(table_binary_spacer)
+        table_binary_layout.add_widget(weight_binary_button)
+
+
+        self.add_widget(table_binary_layout)
+
+        table_header_layout = BoxLayout(orientation="horizontal", size_hint = (1, 0.15))
+        table_header_layout.add_widget(Label(text="Date"))
+        table_header_layout.add_widget(Label(text="Weight"))
+        self.add_widget(table_header_layout)
+
+        scrollview = ScrollView()
+        self.table_layout = GridLayout(cols=2, size_hint_y=None)
+        self.table_layout.bind(minimum_height=self.table_layout.setter('height'))
+
+        self.populate_table()
+
+        scrollview.add_widget(self.table_layout)
+        self.add_widget(scrollview)
+
+    def populate_table(self):
+        self.table_layout.clear_widgets()
+        weight_column_used = "weight" if self.rolling_view == False else "rolling_avg"
+
+        for _, row in self.df.iterrows():
+            self.table_layout.add_widget(Label(text=str(row['date'])))
+            self.table_layout.add_widget(Label(text=str(row[weight_column_used])))
+        window_height = Window.height
+        row_height = window_height * 0.05
+        self.table_layout.height = len(self.df) * row_height
+
 class TableGraphContent(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -82,17 +164,8 @@ class TableGraphContent(BoxLayout):
 
     def show_table(self):
         self.clear_widgets()
-
-        scrollview = ScrollView()
-        table_layout = GridLayout(cols=3, size_hint_y=None)
-        table_layout.bind(minimum_height=table_layout.setter('height'))
-
-        for i in range(4):
-            for j in range(3):
-                table_layout.add_widget(Label(text=f'Row {i+1}, Col {j+1}'))
-
-        scrollview.add_widget(table_layout)
-        self.add_widget(scrollview)
+        table_widget = Table()
+        self.add_widget(table_widget)
 
     def show_graph(self):
         self.clear_widgets()
@@ -197,9 +270,4 @@ class WeightScribeApp(App):
             print("Save cancelled.")
 
 if __name__ == '__main__':
-    width = 360
-    height = int((2000/1080) * width)
-    Config.set('graphics', 'width', f'{width}')
-    Config.set('graphics', 'height', f'{height}')
-
     WeightScribeApp().run()
