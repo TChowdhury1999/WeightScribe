@@ -74,7 +74,7 @@ def get_run_indices(motion_2d_arr):
     x_start = motion_2d_arr.shape[1] // 4 
     x_end =  motion_2d_arr.shape[1] * 3 // 4
     motion_2d_arr_middle = motion_2d_arr[:, x_start : x_end]
-    motion_1d_arr = np.mean(motion_2d_arr_middle, axis=1).astype(int)
+    motion_1d_arr = np.mean(motion_2d_arr_middle, axis=1).astype(float)
 
     # the most motion happens at the middle line
     # we know the date is definitely above so lets filter to before then
@@ -92,19 +92,24 @@ def get_run_indices(motion_2d_arr):
 
     return run_indices
 
-def get_middle_frame(video_path):
+def get_percentage_frame(video_path, percentage=0.5):
     """
-    Get the middle frame of video at path
+    Get the % frame of video at path
     """
 
-    # now lets open up the middle frame of the video
+    # now lets open up the % frame of the video
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    cap.set(cv2.CAP_PROP_POS_FRAMES, int(total_frames/2))
+    cap.set(cv2.CAP_PROP_POS_FRAMES, int(total_frames*percentage))
     ret, frame = cap.read()
     cap.release()
 
     return(frame)
+
+def get_min_x(ocr_entry):
+    bounding_box = ocr_entry[0]
+    x_coords = [point[0] for point in bounding_box]
+    return min(x_coords)
 
 def get_runs(reader, frame, motion_2d_arr, run_indices):
     """
@@ -124,6 +129,10 @@ def get_runs(reader, frame, motion_2d_arr, run_indices):
     x_end =  motion_2d_arr.shape[1] * 3 // 4
 
     for run in run_indices:
+        if run[0]<3:
+            cropped_frame = frame[run[0]:run[1]+6, x_start:x_end]
+        elif run[1]+6>frame.shape[0]:
+            cropped_frame = frame[run[0]-3:frame.shape[0], x_start:x_end]
         cropped_frame = frame[run[0]-3:run[1]+6, x_start:x_end]
         gray_frame = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
         text = reader.readtext(gray_frame)
@@ -136,7 +145,9 @@ def get_runs(reader, frame, motion_2d_arr, run_indices):
 
         # for the date it is DD Mmm (YYYY), HH:MM
         if not date_found:
-            no_punc_text = text[0][1].translate(remove_punctuation)
+            sorted_ocr_output = sorted(text, key=get_min_x)
+            sorted_texts = [entry[1].translate(remove_punctuation) for entry in sorted_ocr_output]
+            no_punc_text = " ".join(sorted_texts)
             match = re.match(date_pattern, no_punc_text)
             if bool(match):
                 # date run has been found
@@ -145,13 +156,47 @@ def get_runs(reader, frame, motion_2d_arr, run_indices):
         
         # for the weight, the second tuple should have kg as the middle element
         if not weight_found:
-            if len(text)<2:
-                continue
-            match = re.match(r"kg", text[1][1])
+            sorted_ocr_output = sorted(text, key=get_min_x)
+            sorted_texts = [entry[1].translate(remove_punctuation) for entry in sorted_ocr_output]
+            no_punc_text = " ".join(sorted_texts)
+            match = re.search(r"kg", no_punc_text)
             if bool(match):
                 # weight run has been found
                 weight_found = True
                 weight_run = run
+
+    return(date_run, weight_run)
+
+def get_runs_to_completion(video_path, reader, motion_2d_arr, run_indices):
+    """
+    Runs get_runs until date and weight runs are found
+    """
+
+    weight_run = []
+    date_run = []
+
+    current_percentage = 1
+
+    iterations = 0
+    max_iterations = 10
+
+    while len(weight_run) == 0 or len(date_run) == 0:
+
+        current_percentage = current_percentage / 2
+
+        frame = get_percentage_frame(video_path, percentage=current_percentage)
+
+        new_date_run, new_weight_run = get_runs(reader, frame, motion_2d_arr, run_indices)
+
+        if len(new_date_run) > 0:
+            date_run = new_date_run
+
+        if len(new_weight_run) > 0:
+            weight_run = new_weight_run
+        
+        iterations += 1
+        if iterations > max_iterations:
+            break
 
     return(date_run, weight_run)
 
@@ -188,6 +233,10 @@ def get_info(video_path, reader, motion_2d_arr, date_run, weight_run):
             break
 
         # crop frame to date portion
+        if date_run[0]<3:
+            cropped_frame = frame[date_run[0]:date_run[1]+6, x_start:x_end]
+        elif date_run[1]+6>frame.shape[0]:
+            cropped_frame = frame[date_run[0]-3:frame.shape[0], x_start:x_end]
         cropped_frame = frame[date_run[0]-3:date_run[1]+6, x_start:x_end]
         gray_frame = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
 
@@ -230,7 +279,9 @@ def get_info(video_path, reader, motion_2d_arr, date_run, weight_run):
         if len(text)>0:
 
             # remove any punctuation
-            no_punc_text = text[0][1].translate(remove_punctuation)
+            sorted_ocr_output = sorted(text, key=get_min_x)
+            sorted_texts = [entry[1].translate(remove_punctuation) for entry in sorted_ocr_output]
+            no_punc_text = " ".join(sorted_texts)
 
             # does it match expected format?
             match = re.match(date_pattern, no_punc_text)
@@ -254,6 +305,8 @@ def get_info(video_path, reader, motion_2d_arr, date_run, weight_run):
             weights.append(np.nan)
 
     cap.release()
+
+    weights = [float(i[:-3]) for i in weights]
 
     return(dates, weights)
 
@@ -296,9 +349,8 @@ def extract_weight_df(video_path, output_path, filename):
 
     motion_2d_arr = get_motion_arr(video_path)
     run_indices = get_run_indices(motion_2d_arr)
-    frame = get_middle_frame(video_path)
     reader = easyocr.Reader(['en'])
-    date_run, weight_run = get_runs(reader, frame, motion_2d_arr, run_indices)
+    date_run, weight_run = get_runs_to_completion(video_path, reader, motion_2d_arr, run_indices)
     dates, weights = get_info(video_path, reader, motion_2d_arr, date_run, weight_run)
     weight_df = package_to_df(dates, weights)
     weight_df = prettify_df(weight_df)
