@@ -20,6 +20,10 @@ import datetime as dt
 from scipy.stats import linregress
 from kivy_garden.graph import Graph, MeshLinePlot, LinePlot, ScatterPlot
 import src.colours as colours
+import video_processing as vp
+import os
+from kivy.clock import Clock
+from threading import Thread
 
 
 class CalloutLabel(AnchorLayout):
@@ -115,11 +119,9 @@ class Table(BoxLayout):
         self.rolling_view = False
         self.df = App.get_running_app().weight_df
 
-        table_binary_layout = BoxLayout(orientation="horizontal", size_hint = (1, 0.1))
-        weight_selection_label = Label(text="Weight", size_hint_x = None)
-        weight_binary_button = BinaryButton(size_hint_x = None, table_widget=self)
-        table_binary_spacer = Label(size_hint_x = 1)
-        table_binary_layout.add_widget(weight_selection_label)
+        table_binary_layout = BoxLayout(orientation="horizontal", size_hint = (1, 0.075))
+        weight_binary_button = BinaryButton(size_hint_x = 0.5, table_widget=self)
+        table_binary_spacer = Label(size_hint_x = 0.5)
         table_binary_layout.add_widget(table_binary_spacer)
         table_binary_layout.add_widget(weight_binary_button)
 
@@ -128,7 +130,7 @@ class Table(BoxLayout):
 
         table_header_layout = BoxLayout(orientation="horizontal", size_hint = (1, 0.15))
         table_header_layout.add_widget(Label(text="Date"))
-        table_header_layout.add_widget(Label(text="Weight"))
+        table_header_layout.add_widget(Label(text="Weight (kg)"))
         self.add_widget(table_header_layout)
 
         scrollview = ScrollView()
@@ -227,8 +229,6 @@ class WeightGraph(BoxLayout):
         graph_controls_layout.add_widget(zoom_in_button)
         self.add_widget(graph_controls_layout)
 
-
-
 class TableGraphContent(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -306,17 +306,19 @@ class WeightScribeApp(App):
         if selection:
             self.video_path = selection[0]
             # Process the video
-            self.process_video()
+            print("start")
+            Thread(target=self.process_video).start()
         else:
             print("No file selected.")
 
     def process_video(self):
-        # Placeholder for video processing
-        # Replace this with your actual video processing function
-        import pandas as pd
-        self.dataframe = pd.DataFrame({'Sample': [1, 2, 3], 'Data': [4, 5, 6]})
+        vp.extract_weight_df(self.video_path, os.path.dirname(os.getcwd())+"/src/data", "weight_data_new")
+        Clock.schedule_once(self.update_ui, 0)
         print("Video processed successfully.")
         self.download_button.disabled = False
+
+    def update_ui(self, dt):
+        print("done")
 
     def download_csv(self, instance):
         if self.dataframe is not None:
