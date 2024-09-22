@@ -24,7 +24,7 @@ import video_processing as vp
 import os
 from kivy.clock import Clock
 from threading import Thread
-
+from kivy.graphics import Color, Line
 
 class CalloutLabel(AnchorLayout):
     def __init__(self, **kwargs):
@@ -50,6 +50,28 @@ class CalloutLabel(AnchorLayout):
         slope, _, _, _, _ = linregress(filtered_df['datetime_numeric'], filtered_df['rolling_avg'])
         return round(slope, 2)
 
+class UnderlinedButton(Button):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.underline_color = (0, 0, 0, 0)  # Default to transparent
+
+    def on_size(self, *args):
+        # Redraw the underline whenever the button is resized
+        self.draw_underline()
+
+    def draw_underline(self):
+        # Remove existing canvas instructions to avoid overlap
+        self.canvas.after.clear()
+
+        with self.canvas.after:
+            Color(*self.underline_color)
+            Line(points=[self.x, self.y, self.right, self.y], width=2)  # Draw the underline at the bottom
+
+    def set_underline(self, color):
+        # Set the underline color and redraw
+        self.underline_color = color
+        self.draw_underline()
+
 
 class TableGraphSelector(BoxLayout):
     def __init__(self, content_widget, **kwargs):
@@ -61,8 +83,9 @@ class TableGraphSelector(BoxLayout):
         # Reference to the content widget where table/graph will be shown
         self.content_widget = content_widget
 
-        self.table_button = Button(text="Table", size_hint = (0.5, 1), state="down")
-        self.graph_button = Button(text="Graph", size_hint = (0.5, 1))
+        self.table_button = UnderlinedButton(text="Table", size_hint = (0.5, 1), background_color = (0, 0, 0, 0), state="down")
+        self.graph_button = UnderlinedButton(text="Graph", size_hint = (0.5, 1), background_color = (0, 0, 0, 0))
+        self.table_button.set_underline((1, 0, 0, 1)) 
         
         self.table_button.bind(on_press=self.show_table)
         self.graph_button.bind(on_press=self.show_graph)
@@ -75,6 +98,9 @@ class TableGraphSelector(BoxLayout):
         # Ensure only the Table button is pressed
         self.table_button.state = "down"
         self.graph_button.state = "normal"
+        self.table_button.set_underline((1, 0, 0, 1)) 
+        self.graph_button.set_underline((0, 0, 0, 0))
+
         # Update content to show the table
         self.content_widget.show_table()
 
@@ -82,6 +108,9 @@ class TableGraphSelector(BoxLayout):
         # Ensure only the Graph button is pressed
         self.table_button.state = "normal"
         self.graph_button.state = "down"
+        self.table_button.set_underline((0, 0, 0, 0)) 
+        self.graph_button.set_underline((1, 0, 0, 1))
+
         # Update content to show the graph
         self.content_widget.show_graph()        
 
@@ -91,8 +120,9 @@ class BinaryButton(BoxLayout):
         self.orientation = "horizontal"
         self.table_widget = table_widget
 
-        self.weight_button = Button(text="Weight", size_hint = (0.5, 1), state="down")
-        self.MA_button = Button(text="MA Weight", size_hint = (0.5, 1))
+        self.weight_button = UnderlinedButton(text="Weight", size_hint = (0.5, 1), state="down", background_color = (0, 0, 0, 0))
+        self.MA_button = UnderlinedButton(text="MA Weight", size_hint = (0.5, 1), background_color = (0, 0, 0, 0))
+        self.weight_button.set_underline((1, 0, 0, 1)) 
 
         self.weight_button.bind(on_press=self.change_weight)
         self.MA_button.bind(on_press=self.change_MA_weight)
@@ -105,12 +135,16 @@ class BinaryButton(BoxLayout):
         self.MA_button.state = "normal"
         self.table_widget.rolling_view = False
         self.table_widget.populate_table()
+        self.weight_button.set_underline((1, 0, 0, 1)) 
+        self.MA_button.set_underline((0, 0, 0, 0))
 
     def change_MA_weight(self, instance):
         self.weight_button.state = "normal"
         self.MA_button.state = "down"
         self.table_widget.rolling_view = True
         self.table_widget.populate_table()
+        self.weight_button.set_underline((0, 0, 0, 0)) 
+        self.MA_button.set_underline((1, 0, 0, 1))
         
 class Table(BoxLayout):
     def __init__(self, **kwargs):
