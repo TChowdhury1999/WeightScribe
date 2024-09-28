@@ -25,6 +25,7 @@ import os
 from kivy.clock import Clock
 from threading import Thread
 from kivy.graphics import Color, Line
+from kivy.uix.image import Image
 
 class CalloutLabel(AnchorLayout):
     def __init__(self, **kwargs):
@@ -71,7 +72,6 @@ class UnderlinedButton(Button):
         # Set the underline color and redraw
         self.underline_color = color
         self.draw_underline()
-
 
 class TableGraphSelector(BoxLayout):
     def __init__(self, content_widget, **kwargs):
@@ -279,7 +279,6 @@ class TableGraphContent(BoxLayout):
         graph = WeightGraph()
         self.add_widget(graph)
 
-
 class WeightScribeApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -295,7 +294,7 @@ class WeightScribeApp(App):
 
         # start with splitting the title bar and app content
         title_body_layout = BoxLayout(orientation='vertical', padding=0, spacing=0)
-        title_label = Label(text="WeightScribe", size_hint = (1, 0.1))
+        title_label = Image(source="src/images/logo.png", size_hint=(1, 0.1), allow_stretch=True, keep_ratio=True)
         title_body_layout.add_widget(title_label)
 
         # add the body 
@@ -315,17 +314,23 @@ class WeightScribeApp(App):
         body_layout.add_widget(table_graph_selector)
         body_layout.add_widget(table_graph_content)
 
-        upload_download_section = BoxLayout(orientation="horizontal", size_hint = (1, 0.2))
 
-        self.select_button = Button(text='Select Video', size_hint=(0.5, 1))
+        lower_buttons = BoxLayout(orientation="horizontal", size_hint = (1, 0.2))
+        upload_download_section = BoxLayout(orientation="vertical", size_hint = (.5, 1))
+
+        self.select_button = Button(text='Select Video', size_hint=(1, .5))
         self.select_button.bind(on_press=self.select_video)
         upload_download_section.add_widget(self.select_button)
 
-        self.download_button = Button(text='Download CSV', size_hint=(.5, 1), disabled=True)
+        self.download_button = Button(text='Download CSV', size_hint=(1, .5), disabled=True)
         self.download_button.bind(on_press=self.download_csv)
-        upload_download_section.add_widget(self.download_button)
 
-        body_layout.add_widget(upload_download_section)
+        upload_download_section.add_widget(self.download_button)
+        lower_buttons.add_widget(upload_download_section)
+
+        add_data_button = Button(text="Add Data", size_hint=(.5, 1))
+        lower_buttons.add_widget(add_data_button)
+        body_layout.add_widget(lower_buttons)
 
         self.video_path = None
         self.dataframe = None
