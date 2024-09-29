@@ -146,6 +146,39 @@ class BinaryButton(BoxLayout):
         self.weight_button.set_underline((0, 0, 0, 0)) 
         self.MA_button.set_underline((1, 0, 0, 1))
         
+class TableSection(Button):
+    def __init__(self, date, **kwargs):
+        super().__init__(**kwargs)
+
+        # Properties
+        self.date = date
+
+        # Visuals
+        self.background_color = (0, 0, 0, 0)
+
+        # Functionality
+        self.long_press_time = 0.5  
+        self._touch = None
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            self._touch = touch
+            # self._touch_start_pos = touch.pos  # Store starting position of touch
+            # Start timer for long press detection
+            Clock.schedule_once(self.trigger_long_press, self.long_press_time)
+        return super().on_touch_down(touch)
+    
+    def on_touch_up(self, touch):
+        if self._touch == touch:
+            Clock.unschedule(self.trigger_long_press)
+            self._touch = None
+        return super().on_touch_up(touch)
+    
+    def trigger_long_press(self, dt):
+        if self._touch:  # Only trigger long press if touch wasn't canceled
+            print("long press")
+            # self.open_edit_popup()
+
 class Table(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -181,8 +214,8 @@ class Table(BoxLayout):
         weight_column_used = "weight" if self.rolling_view == False else "rolling_avg"
 
         for _, row in self.df.iterrows():
-            self.table_layout.add_widget(Label(text=str(row['date'])))
-            self.table_layout.add_widget(Label(text=str(row[weight_column_used])))
+            self.table_layout.add_widget(TableSection(text=str(row['date']), date = row['date']))
+            self.table_layout.add_widget(TableSection(text=str(row[weight_column_used]), date = row['date']))
         window_height = Window.height
         row_height = window_height * 0.05
         self.table_layout.height = len(self.df) * row_height
@@ -328,7 +361,7 @@ class WeightScribeApp(App):
         upload_download_section.add_widget(self.download_button)
         lower_buttons.add_widget(upload_download_section)
 
-        add_data_button = Button(text="Add Data", size_hint=(.5, 1))
+        add_data_button = Button(text="Add Entry", size_hint=(.5, 1))
         lower_buttons.add_widget(add_data_button)
         body_layout.add_widget(lower_buttons)
 
