@@ -212,6 +212,9 @@ class EditEntryPopup(Popup):
             self.title = "Edit Entry"
         else:
             self.title = "Add Entry"
+
+        self.df = App.get_running_app().weight_df
+        self.months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         
         popup_layout = GridLayout(cols=2, padding=10, spacing=10)
 
@@ -238,12 +241,20 @@ class EditEntryPopup(Popup):
         self.weight_input.bind(size=self.update_padding)
         popup_layout.add_widget(self.weight_input)        
 
-        # Add Save and Cancel buttons
+        # Add Save, delete and Cancel buttons
+        delete_button = Button(text="Delete", on_press=self.on_delete, size_hint=(1, 0.2))
+        blank_space = Label(size_hint=(1, 0.2))
         save_button = Button(text="Save", on_press=self.on_save, size_hint=(1, 0.2))
         cancel_button = Button(text="Cancel", on_press=self.dismiss, size_hint=(1, 0.2))  # Closes the popup
 
+        popup_layout.add_widget(delete_button)
+        popup_layout.add_widget(blank_space)
         popup_layout.add_widget(save_button)
         popup_layout.add_widget(cancel_button)
+
+        # Add incorrect format label
+        self.incorrect_format_label = Label(text="\n \n \n ", halign = "center", size_hint=(1, 0.1), color=(1, 0, 0, 1))
+        popup_layout.add_widget(self.incorrect_format_label)
 
         # Assign the layout to the Popup's content
         self.content = popup_layout
@@ -254,7 +265,68 @@ class EditEntryPopup(Popup):
         line_height = 32  # Approximate line height for a single line of text
         instance.padding_y = [(instance.height - line_height) / 2, 0]
 
+    def on_delete(self, instance):
+        # self.table_widget.delete_entry(self.calendar_button.children[-1].text, self.calendar_button.children[1].text, self.calendar_button.children[0].text)
+        if self.title == "Add Entry":
+            self.dismiss()
+            return
+
+        day = self.calendar_button.children[-1].text
+        month = self.months.index(self.calendar_button.children[1].text) + 1
+        year = self.calendar_button.children[0].text
+        date_str = f"{year}-{month:02d}-{day.zfill(2)}"
+
+        # check if date is valid
+        try:
+            # Try to parse the date string in the format YYYY-MM-DD
+            date = dt.datetime.strptime(date_str, '%Y-%m-%d')
+            pass
+        except ValueError:
+            # If it raises a ValueError, the format is not correct
+            self.incorrect_format_label.text = "Invalid date"
+            return
+        
+        # remove from dataframe
+        self.df["datetime"] = pd.to_datetime(self.df["datetime"])
+        self.df = self.df[self.df.datetime.dt.date != date.date()]
+        self.df = vp.prettify_df(self.df)
+
+        self.df.to_csv("src/data/weight_data.csv")
+        App.get_running_app().load_dataframe()
+        App.get_running_app().table_graph_content.show_table()        
+        
+        self.dismiss()
+
     def on_save(self, instance):
+        day = self.calendar_button.children[-1].text
+        month = self.months.index(self.calendar_button.children[1].text) + 1
+        year = self.calendar_button.children[0].text
+        date_str = f"{year}-{month:02d}-{day.zfill(2)}"
+
+        # check if date is valid
+        try:
+            # Try to parse the date string in the format YYYY-MM-DD
+            date = dt.datetime.strptime(date_str, '%Y-%m-%d')
+            pass
+        except ValueError:
+            # If it raises a ValueError, the format is not correct
+            self.incorrect_format_label.text = "Invalid date"
+            return
+
+        # check if the date already exists
+        if date.date() in pd.to_datetime(self.df.datetime).dt.date.values:
+            self.df.loc[pd.to_datetime(self.df.datetime).dt.date == date.date(), "weight"] = round(float(self.weight_input.text), 2)
+            self.df = vp.prettify_df(self.df)
+        else:
+            new_df = self.df[["datetime", "weight"]]
+            new_entry = pd.DataFrame({"datetime": date, "weight": round(float(self.weight_input.text), 2)}, index=[0])
+            new_df = pd.concat([new_df, new_entry], ignore_index=True)
+            new_df["datetime"] = pd.to_datetime(new_df["datetime"])
+            self.df = vp.prettify_df(new_df)
+
+        self.df.to_csv("src/data/weight_data.csv")
+        App.get_running_app().load_dataframe()
+        App.get_running_app().table_graph_content.show_table()
         self.dismiss()
 
 class TableSection(Button):
@@ -518,11 +590,11 @@ class WeightScribeApp(App):
         body_layout.add_widget(callout_label)
 
         # table graph
-        table_graph_content = TableGraphContent(size_hint = (1, 0.65))
+        self.table_graph_content = TableGraphContent(size_hint = (1, 0.65))
 
-        table_graph_selector = TableGraphSelector(size_hint = (1, 0.05), content_widget=table_graph_content)
+        table_graph_selector = TableGraphSelector(size_hint = (1, 0.05), content_widget=self.table_graph_content)
         body_layout.add_widget(table_graph_selector)
-        body_layout.add_widget(table_graph_content)
+        body_layout.add_widget(self.table_graph_content)
 
         lower_buttons = LowerButtons()
         body_layout.add_widget(lower_buttons)

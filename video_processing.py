@@ -340,8 +340,12 @@ def prettify_df(df):
     df["date"] = df["date"].apply(lambda x: x[:-5] if x[-4:] == str(current_year) else x)
 
     df["datetime"] = pd.to_datetime(df["datetime"])
+    # need to reverse sort
+    df = df.sort_values(by="datetime", ascending=True)
     df.set_index("datetime", inplace=True)
     df['rolling_avg'] = df['weight'].rolling(window='7D').mean().round(2)
+    # now undo the sort
+    df = df.sort_index(ascending=False)
 
     return df
 
